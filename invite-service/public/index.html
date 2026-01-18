@@ -364,7 +364,8 @@
                 fetchAnalytics();
 
             } catch (e) {
-                alert('Generation failed');
+                console.error(e);
+                alert('Generation failed: ' + e.message);
             }
         }
 
@@ -375,7 +376,7 @@
                 await fetch('/api/reset', { method: 'DELETE' });
                 fetchAnalytics();
             } catch (e) {
-                alert('Reset failed');
+                alert('Reset failed: ' + e.message);
             }
         }
 
