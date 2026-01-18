@@ -3,21 +3,46 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Render Persistence: Use /opt/render/project/data if available
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 
-// Ensure Data Directory exists
+// Ensure Data Directory Exists
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Middleware
+const DB_PATH = path.join(DATA_DIR, 'tokens.db');
+console.log(`Database path: ${DB_PATH}`);
+
+// Initialize DB
+const db = new sqlite3.Database(DB_PATH, (err) => {
+    if (err) {
+        console.error('Error opening database', err);
+    } else {
+        console.log('Connected to the SQLite database.');
+        // Create table if not exists
+        db.run(`CREATE TABLE IF NOT EXISTS tokens (
+            token TEXT PRIMARY KEY,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            used INTEGER DEFAULT 0,
+            used_at DATETIME
+        )`);
+    }
+});
+
+app.use(express.json());
+app.use(express.static('public'));
+
+// CORS Configuration
 const allowedOrigins = [
     'https://mentrastchat.vercel.app',
     'http://localhost:3000',
-    'https://mentrast-lp.vercel.app' // Assuming landing page might be here or similar
+    'https://mentrast-lp.vercel.app'
 ];
 
 app.use(cors({
@@ -25,116 +50,50 @@ app.use(cors({
         // allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) === -1) {
-            // Optional: specifically allow null/undefined for local testing if needed, 
-            // but for safety in production usually we want to be strict.
-            // For now, let's allow all if it's not in list to avoid "blocked" errors during debug 
-            // OR strictly verify. Let's be permissive for "mentrast" domains if we wanted, 
-            // but simple array check is standard.
-
-            // returning valid response for now to ensure it works for the user immediately
-            // return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+            var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
         }
         return callback(null, true);
     },
     credentials: true
 }));
-app.use(express.json());
-app.use(express.static('public'));
 
-// Database Setup
-const dbPath = path.join(DATA_DIR, 'tokens.db');
-console.log(`Database path: ${dbPath}`);
-
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error opening database:', err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-        initDb();
-    }
-});
-
-function initDb() {
-    db.run(`CREATE TABLE IF NOT EXISTS tokens (
-        token TEXT PRIMARY KEY,
-        used INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        used_at DATETIME
-    )`, (err) => {
-        if (!err) {
-            // Migration: Add used_at if it doesn't exist (for existing DBs)
-            // SQLite doesn't support IF NOT EXISTS for ADD COLUMN directly in standard SQL universally in one liner without checking pragma
-            // A simple try-catch approach for "lazy migration":
-            db.run(`ALTER TABLE tokens ADD COLUMN used_at DATETIME`, (err) => {
-                // Ignore error if column already exists
-            });
-        }
-    });
+// Helper to generate 7-char alphanumeric token
+function generateToken() {
+    return crypto.randomBytes(4).toString('hex').slice(0, 7).toUpperCase();
 }
 
-// Token Generation Helper
-function generateRandomToken() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let token = '';
-    const length = 7; // Rules say 6-8. Picking 7 as sweet spot.
-    for (let i = 0; i < length; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return token;
-}
-
-// API Endpoints
-
-// 1. Generate Tokens
+// 1. Generate Tokens (Admin)
 app.post('/api/generate', (req, res) => {
-    const count = parseInt(req.body.count) || 1;
-    const maxRetries = 10;
+    const count = req.body.count || 1;
     const successfulTokens = [];
 
-    const insertToken = async () => {
-        let retries = 0;
-        let inserted = false;
-        let token = '';
-
-        while (!inserted && retries < maxRetries) {
-            token = generateRandomToken();
-            try {
-                await new Promise((resolve, reject) => {
-                    db.run('INSERT INTO tokens (token) VALUES (?)', [token], function (err) {
-                        if (err) {
-                            if (err?.message.includes('UNIQUE constraint failed')) {
-                                resolve(false); // Collision, try again
-                            } else {
-                                reject(err);
-                            }
-                        } else {
-                            resolve(true);
-                        }
-                    });
-                }).then(success => {
-                    if (success) inserted = true;
-                    else retries++;
-                });
-            } catch (e) {
-                console.error('DB Error:', e);
-                break;
-            }
-        }
-
-        if (inserted) return token;
-        return null;
+    const insertToken = () => {
+        return new Promise((resolve) => {
+            const token = generateToken();
+            db.run('INSERT INTO tokens (token) VALUES (?)', [token], function (err) {
+                if (err) {
+                    // Duplicate, resolve null to retry
+                    resolve(null);
+                } else {
+                    resolve(token);
+                }
+            });
+        });
     };
 
     (async () => {
         for (let i = 0; i < count; i++) {
-            const token = await insertToken();
-            if (token) successfulTokens.push(token);
+            let token = null;
+            let retries = 0;
+            // Retry a few times if collision
+            while (!token && retries < 5) {
+                token = await insertToken();
+                if (!token) retries++;
+            }
+            if (token) successfulTokens.push({ token, used: 0 });
         }
-        res.json({
-            success: true,
-            generated: successfulTokens,
-            count: successfulTokens.length
-        });
+        res.json({ success: true, generated: successfulTokens });
     })();
 });
 
@@ -161,12 +120,12 @@ app.get('/api/verify/:token', (req, res) => {
     });
 });
 
-// 3. Consume Token
+// 3. Consume Token (After Verification/Signup)
 app.post('/api/consume/:token', (req, res) => {
     const token = req.params.token;
+    console.log(`[CONSUME] Request received for token: ${token} at ${new Date().toISOString()}`);
 
     // Set used=1 AND used_at timestamp
-    console.log(`[CONSUME] Request received for token: ${token} at ${new Date().toISOString()}`);
     db.run('UPDATE tokens SET used = 1, used_at = CURRENT_TIMESTAMP WHERE token = ? AND used = 0', [token], function (err) {
         if (err) {
             return res.status(500).json({ error: err.message });
@@ -179,6 +138,7 @@ app.post('/api/consume/:token', (req, res) => {
                 return res.status(500).json({ error: 'Unknown failed to consume' });
             });
         } else {
+            console.log(`[CONSUME] SUCCESS: ${token}`);
             res.json({ success: true, message: 'Token consumed' });
         }
     });
@@ -187,11 +147,10 @@ app.post('/api/consume/:token', (req, res) => {
 // 4. Analytics
 app.get('/api/analytics', (req, res) => {
     const analytics = {};
-
-    // Run parallel queries
     db.serialize(() => {
+        // Stats
         db.get('SELECT COUNT(*) as total FROM tokens', (err, row) => {
-            if (err) return;
+            if (err) return res.status(500).json({ error: err.message });
             analytics.total = row.total;
 
             db.get('SELECT COUNT(*) as used FROM tokens WHERE used = 1', (err, row) => {
@@ -200,14 +159,15 @@ app.get('/api/analytics', (req, res) => {
                 analytics.unused = analytics.total - analytics.used;
                 analytics.conversionRate = analytics.total > 0 ? ((analytics.used / analytics.total) * 100).toFixed(1) + '%' : '0%';
 
-                // Get recent usage
+                // Recent Usage
                 db.all('SELECT token, used_at FROM tokens WHERE used = 1 ORDER BY used_at DESC LIMIT 10', (err, rows) => {
                     if (err) return;
                     analytics.recent = rows;
 
-                    // Get recent generated (latest 10)
+                    // Latest Created (for UI)
                     db.all('SELECT token, created_at, used FROM tokens ORDER BY created_at DESC LIMIT 10', (err, rows) => {
-                        if (!err) analytics.latest_tokens = rows;
+                        if (err) return;
+                        analytics.latest_tokens = rows;
                         res.json(analytics);
                     });
                 });
@@ -221,6 +181,7 @@ app.delete('/api/reset', (req, res) => {
     db.serialize(() => {
         db.run('DELETE FROM tokens');
         db.run('VACUUM'); // Reclaim space
+        console.log('[RESET] System reset by admin');
         res.json({ success: true, message: 'System reset complete' });
     });
 });
