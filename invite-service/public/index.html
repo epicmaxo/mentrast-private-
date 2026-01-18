@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mentrast Protocol | Invite Generation</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --surface: #111;
+            --border: #222;
+            --text: #eee;
+            --text-dim: #888;
+            --accent: #fff;
+            --success: #4f4;
+            --error: #f44;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .controls {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border-radius: 4px;
+        }
+
+        input {
+            background: #000;
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 10px 15px;
+            font-family: inherit;
+            width: 80px;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        button {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 10px 25px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .output-area {
+            margin-top: 40px;
+        }
+
+        .token-header {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        #tokenList {
+            display: grid;
+            gap: 10px;
+        }
+
+        .token-item {
+            background: #0a0a0a;
+            border: 1px solid var(--border);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .token-item:hover {
+            border-color: #444;
+        }
+
+        .token-val {
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            color: var(--accent);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: var(--text-dim);
+            padding: 5px 12px;
+            font-size: 0.75rem;
+        }
+
+        .action-btn:hover {
+            border-color: #666;
+            color: var(--text);
+        }
+
+        #status {
+            margin-left: auto;
+            font-size: 0.9rem;
+        }
+
+        .success-msg {
+            color: var(--success);
+        }
+
+        .error-msg {
+            color: var(--error);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Mentrast // Invite Protocol</h1>
+            <div title="System Online"><span class="status-dot"></span></div>
+        </header>
+
+        <div class="controls">
+            <span style="color: var(--text-dim)">GENERATE BATCH:</span>
+            <input type="number" id="count" value="1" min="1" max="100" />
+            <button onclick="generateTokens()">Execute</button>
+            <div id="status"></div>
+        </div>
+
+        <div class="output-area">
+            <div class="token-header">
+                <span>Recent Tokens</span>
+                <span>Actions</span>
+            </div>
+            <div id="tokenList"></div>
+        </div>
+    </div>
+
+    <script>
+        async function generateTokens() {
+            const countBtn = document.getElementById('count');
+            const count = countBtn.value;
+            const statusEl = document.getElementById('status');
+            const listEl = document.getElementById('tokenList');
+
+            statusEl.textContent = 'PROCESSING...';
+            statusEl.className = '';
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ count: parseInt(count) })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    statusEl.textContent = `SUCCESS: ${data.count} TOKENS GENERATED`;
+                    statusEl.className = 'success-msg';
+
+                    data.generated.forEach(token => {
+                        const div = document.createElement('div');
+                        div.className = 'token-item';
+                        // Assuming standard port 3000 for main app
+                        const link = `http://localhost:3000/register?invite=${token}`;
+                        div.innerHTML = `
+                            <span class="token-val">${token}</span>
+                            <div class="actions">
+                                <button class="action-btn" onclick="copyToClipboard('${token}')">COPY CODE</button>
+                                <button class="action-btn" onclick="copyToClipboard('${link}')">COPY LINK</button>
+                            </div>
+                        `;
+                        // Insert at top
+                        listEl.insertBefore(div, listEl.firstChild);
+                    });
+                } else {
+                    statusEl.textContent = 'GENERATION FAILED';
+                    statusEl.className = 'error-msg';
+                }
+            } catch (e) {
+                console.error(e);
+                statusEl.textContent = 'CONNECTION REFUSED';
+                statusEl.className = 'error-msg';
+            }
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                // Subtle flash effect or toast would be nice here, but simple alert for now
+                // Actually, let's just log it or change button text briefly
+                console.log('Copied:', text);
+            } catch (err) {
+                console.error('Failed to copy', err);
+            }
+        }
+    </script>
+</body>
+
+</html>
