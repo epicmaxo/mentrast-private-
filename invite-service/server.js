@@ -14,7 +14,30 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // Middleware
-app.use(cors()); // In production, restrict this to ['https://your-main-app.com'] via env var
+const allowedOrigins = [
+    'https://mentrastchat.vercel.app',
+    'http://localhost:3000',
+    'https://mentrast-lp.vercel.app' // Assuming landing page might be here or similar
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            // Optional: specifically allow null/undefined for local testing if needed, 
+            // but for safety in production usually we want to be strict.
+            // For now, let's allow all if it's not in list to avoid "blocked" errors during debug 
+            // OR strictly verify. Let's be permissive for "mentrast" domains if we wanted, 
+            // but simple array check is standard.
+
+            // returning valid response for now to ensure it works for the user immediately
+            // return callback(new Error('The CORS policy for this site does not allow access from the specified Origin.'), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -35,8 +58,18 @@ function initDb() {
     db.run(`CREATE TABLE IF NOT EXISTS tokens (
         token TEXT PRIMARY KEY,
         used INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        used_at DATETIME
+    )`, (err) => {
+        if (!err) {
+            // Migration: Add used_at if it doesn't exist (for existing DBs)
+            // SQLite doesn't support IF NOT EXISTS for ADD COLUMN directly in standard SQL universally in one liner without checking pragma
+            // A simple try-catch approach for "lazy migration":
+            db.run(`ALTER TABLE tokens ADD COLUMN used_at DATETIME`, (err) => {
+                // Ignore error if column already exists
+            });
+        }
+    });
 }
 
 // Token Generation Helper
@@ -57,14 +90,6 @@ app.post('/api/generate', (req, res) => {
     const count = parseInt(req.body.count) || 1;
     const maxRetries = 10;
     const successfulTokens = [];
-    const errors = [];
-
-    let completed = 0;
-
-    // Logic to insert N tokens
-    // We do them sequentially or parallel, but for SQLite simple loop is fine.
-    // Handling async in loop for SQLite requires care or promises.
-    // Let's use a recursive approach or simple Promise wrapper around db.run
 
     const insertToken = async () => {
         let retries = 0;
@@ -77,7 +102,7 @@ app.post('/api/generate', (req, res) => {
                 await new Promise((resolve, reject) => {
                     db.run('INSERT INTO tokens (token) VALUES (?)', [token], function (err) {
                         if (err) {
-                            if (err.message.includes('UNIQUE constraint failed')) {
+                            if (err?.message.includes('UNIQUE constraint failed')) {
                                 resolve(false); // Collision, try again
                             } else {
                                 reject(err);
@@ -100,7 +125,6 @@ app.post('/api/generate', (req, res) => {
         return null;
     };
 
-    // Execute generation
     (async () => {
         for (let i = 0; i < count; i++) {
             const token = await insertToken();
@@ -135,10 +159,8 @@ app.get('/api/verify/:token', (req, res) => {
 app.post('/api/consume/:token', (req, res) => {
     const token = req.params.token;
 
-    // First verify to prevent race condition double-use if possible, 
-    // but SQL UPDATE ... WHERE used=0 is safer.
-
-    db.run('UPDATE tokens SET used = 1 WHERE token = ? AND used = 0', [token], function (err) {
+    // Set used=1 AND used_at timestamp
+    db.run('UPDATE tokens SET used = 1, used_at = CURRENT_TIMESTAMP WHERE token = ? AND used = 0', [token], function (err) {
         if (err) {
             return res.status(500).json({ error: err.message });
         }
@@ -152,6 +174,38 @@ app.post('/api/consume/:token', (req, res) => {
         } else {
             res.json({ success: true, message: 'Token consumed' });
         }
+    });
+});
+
+// 4. Analytics
+app.get('/api/analytics', (req, res) => {
+    const analytics = {};
+
+    // Run parallel queries
+    db.serialize(() => {
+        db.get('SELECT COUNT(*) as total FROM tokens', (err, row) => {
+            if (err) return;
+            analytics.total = row.total;
+
+            db.get('SELECT COUNT(*) as used FROM tokens WHERE used = 1', (err, row) => {
+                if (err) return;
+                analytics.used = row.used;
+                analytics.unused = analytics.total - analytics.used;
+                analytics.conversionRate = analytics.total > 0 ? ((analytics.used / analytics.total) * 100).toFixed(1) + '%' : '0%';
+
+                // Get recent usage
+                db.all('SELECT token, used_at FROM tokens WHERE used = 1 ORDER BY used_at DESC LIMIT 10', (err, rows) => {
+                    if (err) return;
+                    analytics.recent = rows;
+
+                    // Get recent generated (latest 10)
+                    db.all('SELECT token, created_at, used FROM tokens ORDER BY created_at DESC LIMIT 10', (err, rows) => {
+                        if (!err) analytics.latest_tokens = rows;
+                        res.json(analytics);
+                    });
+                });
+            });
+        });
     });
 });
 

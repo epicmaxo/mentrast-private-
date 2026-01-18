@@ -4,17 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mentrast Protocol | Invite Generation</title>
+    <title>Mentrast Protocol | Invite Analytics</title>
     <style>
         :root {
             --bg: #050505;
-            --surface: #111;
+            --surface: #0a0a0a;
+            --surface-hover: #111;
             --border: #222;
             --text: #eee;
-            --text-dim: #888;
+            --text-dim: #666;
             --accent: #fff;
-            --success: #4f4;
+            --success: #0f0;
             --error: #f44;
+            --font-mono: 'Courier New', monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         * {
@@ -22,7 +25,7 @@
         }
 
         body {
-            font-family: 'Courier New', monospace;
+            font-family: var(--font-mono);
             background: var(--bg);
             color: var(--text);
             margin: 0;
@@ -35,144 +38,229 @@
 
         .container {
             width: 100%;
-            max-width: 900px;
+            max-width: 1000px;
+            display: grid;
+            gap: 40px;
         }
 
+        /* HEADER */
         header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
             padding-bottom: 20px;
-            margin-bottom: 30px;
         }
 
         h1 {
-            font-size: 1.2rem;
+            font-size: 1rem;
             text-transform: uppercase;
             letter-spacing: 2px;
             margin: 0;
             font-weight: 400;
+            color: var(--text-dim);
+        }
+
+        .brand {
+            color: var(--accent);
+            font-weight: bold;
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             background: var(--success);
             border-radius: 50%;
             display: inline-block;
-            box-shadow: 0 0 10px var(--success);
+            box-shadow: 0 0 8px var(--success);
+            margin-right: 8px;
         }
 
-        .controls {
+        /* METRICS GRID */
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-card {
             background: var(--surface);
             border: 1px solid var(--border);
             padding: 20px;
             display: flex;
-            gap: 15px;
-            align-items: center;
-            border-radius: 4px;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            color: var(--accent);
+        }
+
+        .metric-sub {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        /* GENERATION CONTROLS */
+        .controls-section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 25px;
+        }
+
+        .controls-header {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0;
+            margin-bottom: 10px;
         }
 
         input {
             background: #000;
             border: 1px solid var(--border);
+            border-right: none;
             color: var(--accent);
-            padding: 10px 15px;
+            padding: 15px;
             font-family: inherit;
-            width: 80px;
+            width: 100px;
             text-align: center;
             font-size: 1rem;
+            outline: none;
         }
 
-        button {
+        input:focus {
+            border-color: #444;
+        }
+
+        button.gen-btn {
             background: var(--accent);
             color: #000;
             border: none;
-            padding: 10px 25px;
+            padding: 15px 30px;
             font-family: inherit;
             font-weight: bold;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
-            transition: opacity 0.2s;
+            transition: all 0.2s;
+            flex-grow: 1;
         }
 
-        button:hover {
-            opacity: 0.9;
+        button.gen-btn:hover {
+            background: #ddd;
         }
 
-        button:active {
-            transform: translateY(1px);
-        }
-
-        .output-area {
-            margin-top: 40px;
-        }
-
-        .token-header {
+        /* OUTPUT LIST */
+        .output-list {
+            margin-top: 20px;
             display: flex;
-            justify-content: space-between;
-            color: var(--text-dim);
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            margin-bottom: 10px;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        #tokenList {
-            display: grid;
-            gap: 10px;
-        }
-
-        .token-item {
-            background: #0a0a0a;
-            border: 1px solid var(--border);
-            padding: 15px;
+        .token-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: border-color 0.2s;
-        }
-
-        .token-item:hover {
-            border-color: #444;
-        }
-
-        .token-val {
-            font-size: 1.2rem;
-            letter-spacing: 3px;
-            color: var(--accent);
-        }
-
-        .actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .action-btn {
-            background: transparent;
-            border: 1px solid #333;
-            color: var(--text-dim);
-            padding: 5px 12px;
-            font-size: 0.75rem;
-        }
-
-        .action-btn:hover {
-            border-color: #666;
-            color: var(--text);
-        }
-
-        #status {
-            margin-left: auto;
+            padding: 12px;
+            background: #000;
+            border: 1px solid var(--border);
             font-size: 0.9rem;
         }
 
-        .success-msg {
-            color: var(--success);
+        .token-code {
+            color: var(--accent);
+            letter-spacing: 2px;
+            font-weight: bold;
         }
 
-        .error-msg {
-            color: var(--error);
+        .copy-actions button {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .copy-actions button:hover {
+            color: var(--accent);
+        }
+
+        /* LOGS TABLE */
+        .logs-section {
+            margin-top: 40px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-dim);
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            font-weight: normal;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #111;
+            color: #888;
+        }
+
+        .log-time {
+            color: var(--text-dim);
+        }
+
+        .log-token {
+            color: var(--accent);
+        }
+
+        /* UTILS */
+        .refresh-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 5px 10px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+
+        .refresh-btn:hover {
+            color: var(--accent);
+            border-color: #444;
+        }
+
+        .section-title {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            padding-left: 5px;
+            border-left: 2px solid var(--accent);
         }
     </style>
 </head>
@@ -180,35 +268,153 @@
 <body>
     <div class="container">
         <header>
-            <h1>Mentrast // Invite Protocol</h1>
-            <div title="System Online"><span class="status-dot"></span></div>
+            <h1><span class="brand">MENTRAST</span> // PROTOCOL ADMIN</h1>
+            <div style="display: flex; align-items: center; font-size: 0.7rem;">
+                <span class="status-dot"></span> SYSTEM ONLINE
+            </div>
         </header>
 
-        <div class="controls">
-            <span style="color: var(--text-dim)">GENERATE BATCH:</span>
-            <input type="number" id="count" value="1" min="1" max="100" />
-            <button onclick="generateTokens()">Execute</button>
-            <div id="status"></div>
+        <!-- ANALYTICS -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="section-title" style="margin:0">Network Telemetry</div>
+                <button class="refresh-btn" onclick="fetchAnalytics()">REFRESH DATA</button>
+            </div>
+
+            <div class="metrics">
+                <div class="metric-card">
+                    <span class="metric-label">Total Supply</span>
+                    <span class="metric-value" id="stat-total">-</span>
+                    <span class="metric-sub">Issued Tokens</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Identities Initialized</span>
+                    <span class="metric-value" id="stat-used">-</span>
+                    <span class="metric-sub">Consumed Tokens</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Available Capacity</span>
+                    <span class="metric-value" id="stat-unused">-</span>
+                    <span class="metric-sub">Ready for use</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Conversion Rate</span>
+                    <span class="metric-value" id="stat-rate">-</span>
+                    <span class="metric-sub">Utilization</span>
+                </div>
+            </div>
         </div>
 
-        <div class="output-area">
-            <div class="token-header">
-                <span>Recent Tokens</span>
-                <span>Actions</span>
+        <!-- GENERATOR -->
+        <div class="controls-section">
+            <div class="controls-header">
+                <span>Issue New Invites</span>
             </div>
-            <div id="tokenList"></div>
+            <div class="input-group">
+                <input type="number" id="count" value="1" min="1" max="50" />
+                <button class="gen-btn" onclick="generateTokens()">Generate Keys</button>
+            </div>
+            <div id="output" class="output-list"></div>
+        </div>
+
+        <!-- RECENT ACTIVITY -->
+        <div>
+            <div class="section-title">Recent Activations</div>
+            <table id="logs-table">
+                <thead>
+                    <tr>
+                        <th>TOKEN HASH</th>
+                        <th>TIMESTAMP (UTC)</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-body">
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 20px;">Loading telemetry...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
     <script>
-        async function generateTokens() {
-            const countBtn = document.getElementById('count');
-            const count = countBtn.value;
-            const statusEl = document.getElementById('status');
-            const listEl = document.getElementById('tokenList');
+        // INIT
+        fetchAnalytics();
 
-            statusEl.textContent = 'PROCESSING...';
-            statusEl.className = '';
+        async function fetchAnalytics() {
+            try {
+                const res = await fetch('/api/analytics');
+                const data = await res.json();
+
+                // Update Metrics
+                document.getElementById('stat-total').textContent = data.total;
+                document.getElementById('stat-used').textContent = data.used;
+                document.getElementById('stat-unused').textContent = data.unused;
+                document.getElementById('stat-rate').textContent = data.conversionRate;
+
+                if (data.latest_tokens) {
+                    renderRecentTokens(data.latest_tokens);
+                }
+
+                // Update Logs
+                const tbody = document.getElementById('logs-body');
+                tbody.innerHTML = '';
+
+                if (data.recent && data.recent.length > 0) {
+                    data.recent.forEach(log => {
+                        const tr = document.createElement('tr');
+                        const time = log.used_at ? new Date(log.used_at + 'Z').toLocaleString('en-US', {
+                            hour12: false,
+                            hour: '2-digit', minute: '2-digit', second: '2-digit',
+                            day: '2-digit', month: 'short'
+                        }) : 'N/A';
+
+                        tr.innerHTML = `
+                            <td class="log-token">${log.token}</td>
+                            <td class="log-time">${time}</td>
+                            <td style="color: var(--success)">CONSUMED</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #333">No recent activations detected</td></tr>';
+                }
+
+            } catch (e) {
+                console.error("Failed to fetch analytics", e);
+            }
+        }
+
+        function renderRecentTokens(tokens) {
+            const output = document.getElementById('output');
+            output.innerHTML = ''; // Clear current
+
+            tokens.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'token-row';
+                if (t.used) div.style.opacity = '0.5';
+
+                const origin = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://mentrastchat.vercel.app';
+                const link = `${origin}/register?invite=${t.token}`;
+
+                div.innerHTML = `
+                    <span class="token-code">${t.token} ${t.used ? '<span style="font-size:0.6rem; color:var(--success)">(USED)</span>' : ''}</span>
+                    <div class="copy-actions">
+                        <button onclick="copyToClipboard('${t.token}')">[ COPY CODE ]</button>
+                        <button onclick="copyToClipboard('${link}')">[ COPY LINK ]</button>
+                    </div>
+                `;
+                output.appendChild(div);
+            });
+        }
+
+        async function generateTokens() {
+            const btn = document.querySelector('.gen-btn');
+            const count = document.getElementById('count').value;
+            const output = document.getElementById('output');
+
+            btn.textContent = 'Allocating...';
+            btn.disabled = true;
 
             try {
                 const res = await fetch('/api/generate', {
@@ -219,43 +425,41 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    statusEl.textContent = `SUCCESS: ${data.count} TOKENS GENERATED`;
-                    statusEl.className = 'success-msg';
-
+                    // Prepend new tokens
                     data.generated.forEach(token => {
                         const div = document.createElement('div');
-                        div.className = 'token-item';
-                        // Assuming standard port 3000 for main app
-                        const link = `http://localhost:3000/register?invite=${token}`;
+                        div.className = 'token-row';
+
+                        // Construct Invite Link (Dynamically use host if possible, else logic from prompt)
+                        const origin = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://mentrast.com';
+                        const link = `${origin}/register?invite=${token}`;
+
                         div.innerHTML = `
-                            <span class="token-val">${token}</span>
-                            <div class="actions">
-                                <button class="action-btn" onclick="copyToClipboard('${token}')">COPY CODE</button>
-                                <button class="action-btn" onclick="copyToClipboard('${link}')">COPY LINK</button>
+                            <span class="token-code">${token}</span>
+                            <div class="copy-actions">
+                                <button onclick="copyToClipboard('${token}')">[ COPY CODE ]</button>
+                                <button onclick="copyToClipboard('${link}')">[ COPY LINK ]</button>
                             </div>
                         `;
-                        // Insert at top
-                        listEl.insertBefore(div, listEl.firstChild);
+                        output.prepend(div);
                     });
-                } else {
-                    statusEl.textContent = 'GENERATION FAILED';
-                    statusEl.className = 'error-msg';
+
+                    fetchAnalytics(); // Refresh stats immediately
                 }
             } catch (e) {
-                console.error(e);
-                statusEl.textContent = 'CONNECTION REFUSED';
-                statusEl.className = 'error-msg';
+                alert('Generation failed');
+            } finally {
+                btn.textContent = 'Generate Keys';
+                btn.disabled = false;
             }
         }
 
         async function copyToClipboard(text) {
             try {
                 await navigator.clipboard.writeText(text);
-                // Subtle flash effect or toast would be nice here, but simple alert for now
-                // Actually, let's just log it or change button text briefly
-                console.log('Copied:', text);
+                // Visual feedback could go here
             } catch (err) {
-                console.error('Failed to copy', err);
+                console.error(err);
             }
         }
     </script>

@@ -80,6 +80,20 @@ async function runTests() {
         process.exit(1);
     }
 
+    // 6. Verify Analytics
+    console.log('6. Checking Analytics...');
+    const analyticsRes = await request('GET', '/analytics');
+    console.log('Response:', analyticsRes);
+    if (typeof analyticsRes.used !== 'number' || analyticsRes.used < 1) {
+        console.error('FAILED: Analytics used count should be at least 1');
+        process.exit(1);
+    }
+
+    if (!Array.isArray(analyticsRes.latest_tokens) || analyticsRes.latest_tokens.length === 0) {
+        console.error('FAILED: Analytics should return latest_tokens');
+        process.exit(1);
+    }
+
     console.log('--- ALL TESTS PASSED ---');
 }
 
