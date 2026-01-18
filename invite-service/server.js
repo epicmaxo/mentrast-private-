@@ -160,6 +160,7 @@ app.post('/api/consume/:token', (req, res) => {
     const token = req.params.token;
 
     // Set used=1 AND used_at timestamp
+    console.log(`[CONSUME] Request received for token: ${token} at ${new Date().toISOString()}`);
     db.run('UPDATE tokens SET used = 1, used_at = CURRENT_TIMESTAMP WHERE token = ? AND used = 0', [token], function (err) {
         if (err) {
             return res.status(500).json({ error: err.message });
