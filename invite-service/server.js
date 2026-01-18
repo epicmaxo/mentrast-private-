@@ -141,16 +141,22 @@ app.post('/api/generate', (req, res) => {
 // 2. Verify Token
 app.get('/api/verify/:token', (req, res) => {
     const token = req.params.token;
+    console.log(`[VERIFY] Request for: ${token} at ${new Date().toISOString()}`);
+
     db.get('SELECT * FROM tokens WHERE token = ?', [token], (err, row) => {
         if (err) {
+            console.error(`[VERIFY] DB Error:`, err);
             return res.status(500).json({ error: err.message });
         }
         if (!row) {
+            console.warn(`[VERIFY] Token NOT FOUND: ${token}`);
             return res.json({ valid: false, reason: 'not_found' });
         }
         if (row.used === 1) {
+            console.warn(`[VERIFY] Token ALREADY USED: ${token}. Used at: ${row.used_at}`);
             return res.json({ valid: false, reason: 'used' });
         }
+        console.log(`[VERIFY] Token VALID: ${token}`);
         res.json({ valid: true });
     });
 });
