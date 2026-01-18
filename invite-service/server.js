@@ -42,7 +42,8 @@ app.use(express.static('public'));
 const allowedOrigins = [
     'https://mentrastchat.vercel.app',
     'http://localhost:3000',
-    'https://mentrast-lp.vercel.app'
+    'https://mentrast-lp.vercel.app',
+    'https://mentrast-private.onrender.com' // Allow self (Admin Dashboard)
 ];
 
 app.use(cors({
