@@ -278,7 +278,12 @@
         <div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <div class="section-title" style="margin:0">Network Telemetry</div>
-                <button class="refresh-btn" onclick="fetchAnalytics()">REFRESH DATA</button>
+                <div>
+                    <button class="refresh-btn"
+                        style="border-color: var(--error); color: var(--error); margin-right: 10px;"
+                        onclick="resetSystem()">RESET SYSTEM</button>
+                    <button class="refresh-btn" onclick="fetchAnalytics()">REFRESH DATA</button>
+                </div>
             </div>
 
             <div class="metrics">
@@ -460,6 +465,17 @@
                 // Visual feedback could go here
             } catch (err) {
                 console.error(err);
+            }
+        }
+        async function resetSystem() {
+            if (!confirm('WARNING: This will delete ALL tokens and data. This cannot be undone. Continue?')) return;
+
+            try {
+                await fetch('/api/reset', { method: 'DELETE' });
+                fetchAnalytics();
+                document.getElementById('output').innerHTML = '';
+            } catch (e) {
+                alert('Reset failed');
             }
         }
     </script>

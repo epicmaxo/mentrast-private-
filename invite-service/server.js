@@ -209,6 +209,15 @@ app.get('/api/analytics', (req, res) => {
     });
 });
 
+// 5. Reset System (Admin)
+app.delete('/api/reset', (req, res) => {
+    db.serialize(() => {
+        db.run('DELETE FROM tokens');
+        db.run('VACUUM'); // Reclaim space
+        res.json({ success: true, message: 'System reset complete' });
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`Invite Service running on port ${PORT}`);
 });
