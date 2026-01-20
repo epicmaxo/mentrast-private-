@@ -4,23 +4,42 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
+// Global Error Handlers to prevent crash
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err);
+    // Keep running if possible, or restart gracefully
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNHANDLED REJECTION:', reason);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Database Connection
-// Use DATABASE_URL from environment (Supabase/Neon)
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) {
-    console.error("FATAL: DATABASE_URL is missing. Please set it in your environment variables.");
-    // We don't exit here to allow debugging, but DB calls will fail.
+let pool;
+try {
+    if (!connectionString) {
+        console.error("⛔ CRITICAL: DATABASE_URL is missing. Please set it in Render Dashboard -> Environment.");
+        // Pool remains undefined. DB calls will fail gracefully with 500.
+    } else {
+        pool = new Pool({
+            connectionString: connectionString,
+            ssl: {
+                rejectUnauthorized: false
+            }
+        });
+    }
+} catch (e) {
+    console.error("Failed to initialize DB Pool:", e);
 }
 
-const pool = new Pool({
-    connectionString: connectionString,
-    ssl: {
-        rejectUnauthorized: false // Required for many cloud Postgres providers
-    }
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', db: pool ? 'init' : 'missing' });
 });
 
 // Initialize DB Table
