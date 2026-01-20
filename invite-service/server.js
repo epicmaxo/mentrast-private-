@@ -1,4 +1,8 @@
 require('dotenv').config();
+const dns = require('dns');
+// Force IPv4 because Render/Supabase interaction often fails on IPv6
+dns.setDefaultResultOrder('ipv4first');
+
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
