@@ -21,8 +21,6 @@ process.on('unhandledRejection', (reason, promise) => {
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Database Connection
-const connectionString = process.env.DATABASE_URL;
 
 // Database Connection
 const connectionString = process.env.DATABASE_URL;
