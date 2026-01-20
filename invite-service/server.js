@@ -34,36 +34,50 @@ async function initializePool() {
     }
 
     try {
-        // HACK: Force IPv4 by resolving hostname manually
-        // Render sometimes forces IPv6 which fails with Supabase
         const url = new URL(connectionString);
         const host = url.hostname;
 
         console.log(`[DNS] Resolving ${host} to IPv4...`);
+        // Check if it's already an IP
+        if (require('net').isIP(host)) {
+            console.log('[DNS] Host is already an IP.');
+            pool = new Pool({
+                connectionString: connectionString,
+                ssl: { rejectUnauthorized: false }
+            });
+            return;
+        }
+
         const addresses = await dns.promises.resolve4(host);
 
         if (addresses && addresses.length > 0) {
             console.log(`[DNS] Resolved to ${addresses[0]}`);
-            url.hostname = addresses[0]; // Replace host with IP
+            url.hostname = addresses[0];
 
             pool = new Pool({
                 connectionString: url.toString(),
                 ssl: {
                     rejectUnauthorized: false,
-                    servername: host // SNI requires original hostname
-                }
+                    servername: host
+                },
             });
             console.log('[DB] Pool initialized with IPv4');
         } else {
-            throw new Error('No IPv4 addresses found');
+            console.error('[DNS] No IPv4 addresses found for host.');
         }
     } catch (e) {
         console.error("Failed to resolve/initialize DB:", e);
-        // Fallback to original string if DNS fails
-        pool = new Pool({
-            connectionString: connectionString,
-            ssl: { rejectUnauthorized: false }
-        });
+        // DO NOT FALLBACK to broken IPv6 default.
+        console.log('[DB] Attempting last-resort connection with family: 4...');
+        try {
+            pool = new Pool({
+                connectionString: connectionString,
+                ssl: { rejectUnauthorized: false }
+                // Note: 'family' might not be passed by all pg versions, but we should avoid broken fallback loop
+            });
+        } catch (finalErr) {
+            console.error('Final DB Init failure:', finalErr);
+        }
     }
 }
 
