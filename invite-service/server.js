@@ -122,12 +122,20 @@ app.use(cors({
     credentials: true
 }));
 
+// Helper to check DB status
+const ensureDB = (req, res, next) => {
+    if (!pool) {
+        return res.status(503).json({ error: 'Database is initializing or failed to connect. Check server logs.' });
+    }
+    next();
+};
+
 function generateToken() {
     return crypto.randomBytes(4).toString('hex').slice(0, 7).toUpperCase();
 }
 
 // 1. Generate Tokens (Admin)
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', ensureDB, async (req, res) => {
     const count = req.body.count || 1;
     const successfulTokens = [];
 
@@ -158,7 +166,7 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // 2. Verify Token
-app.get('/api/verify/:token', async (req, res) => {
+app.get('/api/verify/:token', ensureDB, async (req, res) => {
     const token = req.params.token;
     console.log(`[VERIFY] Request for: ${token} at ${new Date().toISOString()}`);
 
@@ -186,7 +194,7 @@ app.get('/api/verify/:token', async (req, res) => {
 });
 
 // 3. Consume Token
-app.post('/api/consume/:token', async (req, res) => {
+app.post('/api/consume/:token', ensureDB, async (req, res) => {
     const token = req.params.token;
     console.log(`[CONSUME] Request received for token: ${token} at ${new Date().toISOString()}`);
 
@@ -215,7 +223,7 @@ app.post('/api/consume/:token', async (req, res) => {
 });
 
 // 4. Analytics
-app.get('/api/analytics', async (req, res) => {
+app.get('/api/analytics', ensureDB, async (req, res) => {
     try {
         const totalParams = await pool.query('SELECT COUNT(*) as count FROM tokens');
         const usedParams = await pool.query('SELECT COUNT(*) as count FROM tokens WHERE used = 1');
@@ -244,7 +252,7 @@ app.get('/api/analytics', async (req, res) => {
 });
 
 // 5. Reset System (Admin Only)
-app.delete('/api/reset', async (req, res) => {
+app.delete('/api/reset', ensureDB, async (req, res) => {
     try {
         await pool.query('DELETE FROM tokens');
         // VACUUM is handled automatically by Postgres generally, but full vacuum can't be run inside trans block usually.
