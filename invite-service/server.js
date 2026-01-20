@@ -24,22 +24,52 @@ const PORT = process.env.PORT || 3001;
 // Database Connection
 const connectionString = process.env.DATABASE_URL;
 
+// Database Connection
+const connectionString = process.env.DATABASE_URL;
+
 let pool;
-try {
+
+async function initializePool() {
     if (!connectionString) {
         console.error("⛔ CRITICAL: DATABASE_URL is missing. Please set it in Render Dashboard -> Environment.");
-        // Pool remains undefined. DB calls will fail gracefully with 500.
-    } else {
+        return;
+    }
+
+    try {
+        // HACK: Force IPv4 by resolving hostname manually
+        // Render sometimes forces IPv6 which fails with Supabase
+        const url = new URL(connectionString);
+        const host = url.hostname;
+
+        console.log(`[DNS] Resolving ${host} to IPv4...`);
+        const addresses = await dns.promises.resolve4(host);
+
+        if (addresses && addresses.length > 0) {
+            console.log(`[DNS] Resolved to ${addresses[0]}`);
+            url.hostname = addresses[0]; // Replace host with IP
+
+            pool = new Pool({
+                connectionString: url.toString(),
+                ssl: {
+                    rejectUnauthorized: false,
+                    servername: host // SNI requires original hostname
+                }
+            });
+            console.log('[DB] Pool initialized with IPv4');
+        } else {
+            throw new Error('No IPv4 addresses found');
+        }
+    } catch (e) {
+        console.error("Failed to resolve/initialize DB:", e);
+        // Fallback to original string if DNS fails
         pool = new Pool({
             connectionString: connectionString,
-            ssl: {
-                rejectUnauthorized: false
-            }
+            ssl: { rejectUnauthorized: false }
         });
     }
-} catch (e) {
-    console.error("Failed to initialize DB Pool:", e);
 }
+
+initializePool();
 
 // Health Check
 app.get('/api/health', (req, res) => {
