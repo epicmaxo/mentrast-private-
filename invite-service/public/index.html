@@ -253,8 +253,14 @@
 
         <div class="section-title">Issue New Invites</div>
         <div class="control-panel">
-            <input type="number" id="count" value="1" min="1" max="100">
-            <button class="action-btn" onclick="generateTokens()">GENERATE KEYS</button>
+            <div style="display:flex; flex-direction:column; width: 100%;">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="text" id="recipientName" placeholder="Recipient Name (Optional)"
+                        style="flex:1; background:var(--bg); border:1px solid var(--border); color:white; padding:12px 20px; border-radius:8px; font-family:'JetBrains Mono';">
+                    <input type="number" id="count" value="1" min="1" max="100">
+                </div>
+                <button class="action-btn" style="width:100%" onclick="generateTokens()">GENERATE KEYS</button>
+            </div>
         </div>
         <div id="output" style="margin-top: 20px;"></div>
 
@@ -262,8 +268,8 @@
         <div
             style="background: var(--card-bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--border);">
             <div
-                style="padding: 15px; border-bottom: 1px solid var(--border); font-size: 10px; color: var(--text-muted); display: grid; grid-template-columns: 1fr 1fr 1fr; text-transform: uppercase; letter-spacing: 1px;">
-                <div>Token Hash</div>
+                style="padding: 15px; border-bottom: 1px solid var(--border); font-size: 10px; color: var(--text-muted); display: grid; grid-template-columns: 2fr 1fr 1fr; text-transform: uppercase; letter-spacing: 1px;">
+                <div>Token / Recipient</div>
                 <div>Timestamp (UTC)</div>
                 <div style="text-align: right;">Status</div>
             </div>
@@ -286,7 +292,7 @@
                 document.getElementById('stat-unused').textContent = data.unused;
                 document.getElementById('stat-rate').textContent = data.conversionRate;
 
-                // Logs
+                // Logs (Consumed Tokens)
                 const logContainer = document.getElementById('recent-log');
                 logContainer.innerHTML = '';
 
@@ -299,8 +305,28 @@
                         const el = document.createElement('div');
                         el.className = 'token-item';
 
+                        // Show name if exists
+                        const nameDisplay = item.recipient_name
+                            ? `<span style="color:#FFF; opacity:0.6; font-size:12px; margin-left:10px;">👤 ${item.recipient_name}</span>`
+                            : '';
+
+                        // Audit Details
+                        let auditInfo = '';
+                        if (item.activated_by) {
+                            auditInfo = `<div style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+                                <span style="color:var(--success)">Activated by: ${item.activated_by}</span>
+                                ${item.auth_provider ? ` <span style="opacity:0.5">via ${item.auth_provider}</span>` : ''}
+                                ${item.ip_address ? ` <span style="opacity:0.3">[${item.ip_address}]</span>` : ''}
+                            </div>`;
+                        } else {
+                            auditInfo = '<div style="font-size:10px; color:var(--text-muted); margin-top:4px;">Activation info unavailable</div>';
+                        }
+
                         el.innerHTML = `
-                            <div class="token-hash">${item.token}</div>
+                            <div class="token-hash">
+                                <div style="font-family:'JetBrains Mono'">${item.token} ${nameDisplay}</div>
+                                ${auditInfo}
+                            </div>
                             <div class="token-time">${date}</div>
                             <div class="token-status-used" style="font-size: 10px; text-align: right;">CONSUMED</div>
                         `;
@@ -311,9 +337,6 @@
                 }
 
                 // Recent Tokens (Newly generated in this session OR fetched from server)
-                // Note: The UI usually clears "Issue New Invites" output on refresh, 
-                // but we can optionally show recently created unused tokens if the API supported it.
-                // For now, we will inspect the 'latest_tokens' if the API provides it (it does now).
                 if (data.latest_tokens) {
                     renderRecentTokens(data.latest_tokens);
                 }
@@ -336,10 +359,13 @@
                 div.style.alignItems = 'center';
 
                 const status = t.used ? '<span style="color:var(--text-muted)">(USED)</span>' : '<span style="color:var(--success)">(READY)</span>';
+                const nameDisplay = t.recipient_name
+                    ? `<span style="color:#FFF; opacity:0.4; font-size:12px; margin-left:10px;">→ ${t.recipient_name}</span>`
+                    : '';
 
                 div.innerHTML = `
                     <div style="font-family: 'JetBrains Mono'; font-size: 18px;">
-                        ${t.token} ${status}
+                        ${t.token} ${status} ${nameDisplay}
                     </div>
                     <div>
                         <button class="copy-btn" onclick="copyToClipboard('${t.token}')">[ COPY CODE ]</button>
@@ -352,15 +378,23 @@
 
         async function generateTokens() {
             const count = document.getElementById('count').value;
+            const recipient = document.getElementById('recipientName').value; // Get Recipient
+
             try {
                 const res = await fetch(`${API_BASE}/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ count: parseInt(count) })
+                    body: JSON.stringify({
+                        count: parseInt(count),
+                        recipient: recipient // Send to API
+                    })
                 });
                 const data = await res.json();
 
-                // We just refresh the whole list from server to be consistent
+                // Clear input after success
+                document.getElementById('recipientName').value = '';
+
+                // Refresh
                 fetchAnalytics();
 
             } catch (e) {

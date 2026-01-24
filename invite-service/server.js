@@ -104,11 +104,17 @@ app.get('/api/verify/:token', ensureDB, async (req, res) => {
 // 3. Consume Token
 app.post('/api/consume/:token', ensureDB, async (req, res) => {
     const token = req.params.token;
-    console.log(`[CONSUME] Request: ${token}`);
+    const email = req.body.email || 'unknown'; // Track who used it
+    const provider = req.body.provider || 'unknown';
+
+    // Get IP (Render/Express proxy safe)
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+
+    console.log(`[CONSUME] Request: ${token} by ${email} (${provider}) IP: ${ip}`);
     try {
         const result = await pool.query(
-            'UPDATE tokens SET used = 1, used_at = CURRENT_TIMESTAMP WHERE token = $1 AND used = 0',
-            [token]
+            'UPDATE tokens SET used = 1, used_at = CURRENT_TIMESTAMP, activated_by = $2, auth_provider = $3, ip_address = $4 WHERE token = $1 AND used = 0',
+            [token, email, provider, ip]
         );
         if (result.rowCount === 0) {
             const { rows } = await pool.query('SELECT used FROM tokens WHERE token = $1', [token]);
@@ -128,8 +134,8 @@ app.get('/api/analytics', ensureDB, async (req, res) => {
     try {
         const totalRes = await pool.query('SELECT COUNT(*) as count FROM tokens');
         const usedRes = await pool.query('SELECT COUNT(*) as count FROM tokens WHERE used = 1');
-        const recentRes = await pool.query('SELECT token, used_at FROM tokens WHERE used = 1 ORDER BY used_at DESC LIMIT 10');
-        const latestRes = await pool.query('SELECT token, created_at, used FROM tokens ORDER BY created_at DESC LIMIT 10');
+        const recentRes = await pool.query('SELECT token, used_at, recipient_name, activated_by, auth_provider, ip_address FROM tokens WHERE used = 1 ORDER BY used_at DESC LIMIT 10');
+        const latestRes = await pool.query('SELECT token, created_at, used, recipient_name FROM tokens ORDER BY created_at DESC LIMIT 10');
 
         const total = parseInt(totalRes.rows[0].count);
         const used = parseInt(usedRes.rows[0].count);
@@ -188,9 +194,20 @@ async function startServer() {
                     token TEXT PRIMARY KEY,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     used INTEGER DEFAULT 0,
-                    used_at TIMESTAMP
+                    used_at TIMESTAMP,
+                    recipient_name TEXT
                 );
             `);
+            // Attempt to add column if it doesn't exist (Migration logic)
+            try {
+                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS recipient_name TEXT;`);
+                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS activated_by TEXT;`);
+                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS auth_provider TEXT;`);
+                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS ip_address TEXT;`);
+            } catch (e) {
+                console.log("[DB] Columns check skipped or failed (likely already exists or not needed).");
+            }
+
             console.log("✅ [DB] Schema verified.");
         } finally {
             client.release();
