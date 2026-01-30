@@ -19,7 +19,9 @@ const allowedOrigins = [
     'https://mentrastchat.vercel.app',
     'http://localhost:3000',
     'https://mentrast-lp.vercel.app',
-    'https://mentrast-private.onrender.com'
+    'https://mentrast-private.onrender.com',
+    'https://mentrast.com',
+    'https://www.mentrast.com'
 ];
 
 app.use(cors({
