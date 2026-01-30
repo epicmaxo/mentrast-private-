@@ -21,7 +21,8 @@ const allowedOrigins = [
     'https://mentrast-lp.vercel.app',
     'https://mentrast-private.onrender.com',
     'https://mentrast.com',
-    'https://www.mentrast.com'
+    'https://www.mentrast.com',
+    'https://app.mentrast.com'
 ];
 
 app.use(cors({
