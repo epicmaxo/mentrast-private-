@@ -422,7 +422,7 @@
             // Assume Main App is on standard URL, but we can't know for sure in isolated env.
             // Best effort: Copy relative path or ask user to configure.
             // For production, we know the domain:
-            const url = `https://mentrast.com/register?invite=${token}`;
+            const url = `https://app.mentrast.com/register?invite=${token}`;
             navigator.clipboard.writeText(url);
             alert('Invite link copied!');
         }
