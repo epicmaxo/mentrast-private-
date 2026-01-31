@@ -173,60 +173,79 @@ app.delete('/api/reset', ensureDB, async (req, res) => {
 // ----------------------------------------------------
 // SERVER STARTUP SEQUENCE
 // ----------------------------------------------------
-async function startServer() {
-    if (!connectionString) {
-        console.error("⛔ CRITICAL: DATABASE_URL is missing. Please set it in Render Dashboard.");
-        return;
-    }
 
-    try {
-        console.log("[DB] Connecting to PostgreSQL (Pooler Mode)...");
+// Vercel Serverless Function Handler
+if (process.env.VERCEL) {
+    // In Vercel, we need to ensure the DB connection is established for every request checks
+    // However, for "serverless", we typically don't start a persistent listener.
+    // The "app" export is handled by @vercel/node. 
+    // We just need to make sure "pool" is initialized.
 
-        // Disable SSL verification for simple connection to Pooler
+    if (connectionString) {
         pool = new Pool({
             connectionString: connectionString,
             ssl: { rejectUnauthorized: false }
         });
-
-        // Test connection & Init Table
-        const client = await pool.connect();
-        try {
-            console.log("✅ [DB] Connected successfully.");
-            await client.query(`
-                CREATE TABLE IF NOT EXISTS tokens (
-                    token TEXT PRIMARY KEY,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    used INTEGER DEFAULT 0,
-                    used_at TIMESTAMP,
-                    recipient_name TEXT
-                );
-            `);
-            // Attempt to add column if it doesn't exist (Migration logic)
-            try {
-                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS recipient_name TEXT;`);
-                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS activated_by TEXT;`);
-                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS auth_provider TEXT;`);
-                await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS ip_address TEXT;`);
-            } catch (e) {
-                console.log("[DB] Columns check skipped or failed (likely already exists or not needed).");
-            }
-
-            console.log("✅ [DB] Schema verified.");
-        } finally {
-            client.release();
+    }
+} else {
+    // Local Development / Render persistent server
+    async function startServer() {
+        if (!connectionString) {
+            console.error("⛔ CRITICAL: DATABASE_URL is missing. Please set it in Render Dashboard.");
+            return;
         }
 
-        // Only start listener if DB is ready
-        app.listen(PORT, () => {
-            console.log(`✅ Invite Service running on port ${PORT}`);
-        });
+        try {
+            console.log("[DB] Connecting to PostgreSQL (Pooler Mode)...");
 
-    } catch (e) {
-        console.error("❌ [DB] FATAL CONNECTION ERROR:", e.message);
-        console.error("   Ensure you are using the Transaction Pooler URL (port 6543).");
-        // Start anyway to serve logs, pool is null
-        app.listen(PORT, () => console.log(`⚠️ Service running on ${PORT} (DB Disconnected mode)`));
+            // Disable SSL verification for simple connection to Pooler
+            pool = new Pool({
+                connectionString: connectionString,
+                ssl: { rejectUnauthorized: false }
+            });
+
+            // Test connection & Init Table
+            const client = await pool.connect();
+            try {
+                console.log("✅ [DB] Connected successfully.");
+                await client.query(`
+                    CREATE TABLE IF NOT EXISTS tokens (
+                        token TEXT PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        used INTEGER DEFAULT 0,
+                        used_at TIMESTAMP,
+                        recipient_name TEXT
+                    );
+                `);
+                // Attempt to add column if it doesn't exist (Migration logic)
+                try {
+                    await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS recipient_name TEXT;`);
+                    await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS activated_by TEXT;`);
+                    await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS auth_provider TEXT;`);
+                    await client.query(`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS ip_address TEXT;`);
+                } catch (e) {
+                    console.log("[DB] Columns check skipped or failed (likely already exists or not needed).");
+                }
+
+                console.log("✅ [DB] Schema verified.");
+            } finally {
+                client.release();
+            }
+
+            // Only start listener if DB is ready
+            app.listen(PORT, () => {
+                console.log(`✅ Invite Service running on port ${PORT}`);
+            });
+
+        } catch (e) {
+            console.error("❌ [DB] FATAL CONNECTION ERROR:", e.message);
+            console.error("   Ensure you are using the Transaction Pooler URL (port 6543).");
+            // Start anyway to serve logs, pool is null
+            app.listen(PORT, () => console.log(`⚠️ Service running on ${PORT} (DB Disconnected mode)`));
+        }
     }
+
+    startServer();
 }
 
-startServer();
+module.exports = app;
