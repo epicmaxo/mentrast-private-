@@ -55,6 +55,15 @@ function generateToken() {
 // API ENDPOINTS
 // ----------------------------------------------------
 
+// Root Endpoint (for easy availability check)
+app.get('/', (req, res) => {
+    res.json({
+        service: 'Mentrast Invite Service',
+        status: 'running',
+        db: pool ? 'connected' : 'disconnected'
+    });
+});
+
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', db: pool ? 'connected' : 'disconnected' });
 });
