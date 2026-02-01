@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const path = require('path');
 
 // Global Error Handlers
 process.on('uncaughtException', (err) => console.error('UNCAUGHT EXCEPTION:', err));
@@ -37,7 +38,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(express.static('public'));
+// Use absolute path for public directory to work in Vercel
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Middleware: Guard endpoints if DB is not ready
 const ensureDB = (req, res, next) => {
@@ -55,13 +57,19 @@ function generateToken() {
 // API ENDPOINTS
 // ----------------------------------------------------
 
-// Root Endpoint (for easy availability check)
+// Root Endpoint - Serve Login UI
 app.get('/', (req, res) => {
-    res.json({
-        service: 'Mentrast Invite Service',
-        status: 'running',
-        db: pool ? 'connected' : 'disconnected'
-    });
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Admin UI
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Handle .html extension if requested directly
+app.get('/admin.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 app.get('/api/health', (req, res) => {
