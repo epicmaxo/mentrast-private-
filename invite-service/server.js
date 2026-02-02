@@ -76,6 +76,15 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', db: pool ? 'connected' : 'disconnected' });
 });
 
+app.get('/api/debug', (req, res) => {
+    res.json({
+        env_vercel: !!process.env.VERCEL,
+        has_db_url: !!process.env.DATABASE_URL,
+        pool_initialized: !!pool,
+        node_version: process.version
+    });
+});
+
 // 1. Generate Tokens
 app.post('/api/generate', ensureDB, async (req, res) => {
     const count = req.body.count || 1;
@@ -197,18 +206,19 @@ app.delete('/api/reset', ensureDB, async (req, res) => {
 
 // Vercel Serverless Function Handler
 if (process.env.VERCEL) {
-    // In Vercel, we need to ensure the DB connection is established for every request checks
-    // However, for "serverless", we typically don't start a persistent listener.
-    // The "app" export is handled by @vercel/node. 
-    // We just need to make sure "pool" is initialized.
-
-    if (connectionString) {
-        pool = new Pool({
-            connectionString: connectionString,
-            ssl: { rejectUnauthorized: false }
-        });
+    try {
+        if (connectionString) {
+            pool = new Pool({
+                connectionString: connectionString,
+                ssl: { rejectUnauthorized: false },
+                connectionTimeoutMillis: 5000 // Fail fast
+            });
+        }
+    } catch (err) {
+        console.error("Pool Init Error:", err);
     }
 } else {
+    // ... (local dev)
     // Local Development / Render persistent server
     async function startServer() {
         if (!connectionString) {
