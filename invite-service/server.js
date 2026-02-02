@@ -16,11 +16,11 @@ const connectionString = process.env.DATABASE_URL;
 let pool;
 
 // CORS Configuration
-const allowedOrigins = [
-    'https://mentrastchat.vercel.app',
+'https://mentrastchat.vercel.app',
     'http://localhost:3000',
     'https://mentrast-lp.vercel.app',
     'https://mentrast-private.onrender.com',
+    'https://mentrast-private.vercel.app',
     'https://mentrast.com',
     'https://www.mentrast.com',
     'https://app.mentrast.com'
