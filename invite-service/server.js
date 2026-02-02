@@ -79,6 +79,7 @@ app.get('/api/health', (req, res) => {
 // 1. Generate Tokens
 app.post('/api/generate', ensureDB, async (req, res) => {
     const count = req.body.count || 1;
+    const recipient = req.body.recipient || null;
     const successfulTokens = [];
     try {
         const client = await pool.connect();
@@ -89,11 +90,14 @@ app.post('/api/generate', ensureDB, async (req, res) => {
                 while (!token && retries < 5) {
                     const candidate = generateToken();
                     try {
-                        await client.query('INSERT INTO tokens (token) VALUES ($1)', [candidate]);
+                        await client.query(
+                            'INSERT INTO tokens (token, recipient_name) VALUES ($1, $2)',
+                            [candidate, recipient]
+                        );
                         token = candidate;
                     } catch (e) { retries++; }
                 }
-                if (token) successfulTokens.push({ token, used: 0 });
+                if (token) successfulTokens.push({ token, used: 0, recipient_name: recipient });
             }
             res.json({ success: true, generated: successfulTokens });
         } finally { client.release(); }
@@ -261,6 +265,12 @@ if (process.env.VERCEL) {
             app.listen(PORT, () => console.log(`⚠️ Service running on ${PORT} (DB Disconnected mode)`));
         }
     }
+
+    // Global Express Error Handler
+    app.use((err, req, res, next) => {
+        console.error("Global Middleware Error:", err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    });
 
     startServer();
 }
