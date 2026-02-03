@@ -163,6 +163,33 @@ app.post('/api/consume/:token', ensureDB, async (req, res) => {
     }
 });
 
+// 3b. DELETE Token
+app.delete('/api/token/:token', ensureDB, async (req, res) => {
+    const token = req.params.token;
+    try {
+        const result = await pool.query('DELETE FROM tokens WHERE token = $1', [token]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Token not found' });
+        res.json({ success: true, message: 'Token deleted' });
+    } catch (err) {
+        console.error("Delete Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3c. UPDATE Token (Recipient Name)
+app.patch('/api/token/:token', ensureDB, async (req, res) => {
+    const token = req.params.token;
+    const recipient = req.body.recipient_name;
+    try {
+        const result = await pool.query('UPDATE tokens SET recipient_name = $1 WHERE token = $2', [recipient, token]);
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Token not found' });
+        res.json({ success: true, message: 'Token updated' });
+    } catch (err) {
+        console.error("Update Error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 4. Analytics
 app.get('/api/analytics', ensureDB, async (req, res) => {
     try {

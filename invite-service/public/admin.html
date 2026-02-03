@@ -370,6 +370,8 @@
                     <div>
                         <button class="copy-btn" onclick="copyToClipboard('${t.token}')">[ COPY CODE ]</button>
                         <button class="copy-btn" onclick="copyLink('${t.token}')">[ COPY LINK ]</button>
+                        <button class="copy-btn" onclick="editToken('${t.token}')" style="color:var(--accent);">[ EDIT ]</button>
+                        <button class="copy-btn" onclick="deleteToken('${t.token}')" style="color:var(--error);">[ DEL ]</button>
                     </div>
                  `;
                 output.appendChild(div);
@@ -430,6 +432,43 @@
         // Init
         fetchAnalytics();
         setInterval(fetchAnalytics, 5000); // Live update
+
+        async function deleteToken(token) {
+            if (!confirm(`Are you sure you want to DELETE token ${token}?`)) return;
+            try {
+                const res = await fetch(`${API_BASE}/token/${token}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    fetchAnalytics();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Delete failed');
+            }
+        }
+
+        async function editToken(token) {
+            const newName = prompt("Enter new recipient name:");
+            if (newName === null) return; // Cancelled
+            try {
+                const res = await fetch(`${API_BASE}/token/${token}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipient_name: newName })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    fetchAnalytics();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Update failed');
+            }
+        }
     </script>
 </body>
 
